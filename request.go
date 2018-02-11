@@ -92,7 +92,7 @@ func send(method string, httpUrl string, params io.Reader, headers map[string]st
 
 	request.Header.Set("Worker-Id", workerId)
 	request.Header.Set("Token-Id", "X")
-	request.Header.Set("Device-Id", "x.yirendai.com")
+	request.Header.Set("Device-Id", "x.lattecake.com")
 	request.Header.Set("Client-System", "X")
 	request.Header.Set("Client-Time", time.Unix(0, time.Now().UnixNano()).Format("2006-01-02 15:04:05.999999"))
 
