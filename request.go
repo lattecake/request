@@ -1,18 +1,22 @@
 package request
 
 import (
-	"net/http"
-	"net/url"
-	"net"
 	"time"
-	"crypto/tls"
+	"fmt"
+	"io/ioutil"
+	"net/url"
 	"strings"
 	"io"
-	"github.com/satori/go.uuid"
+	"net"
+	"crypto/tls"
+	"net/http"
 	"errors"
-	"io/ioutil"
-	"fmt"
 )
+
+type Request interface {
+	Post(url string, params url.Values, headers map[string]string, proxyUrl string) (body []byte, err error, trans chain)
+	Get(url string, params url.Values, headers map[string]string, proxyUrl string) (body []byte, err error, trans chain)
+}
 
 type chain struct {
 	StartTime int64         `json:"start_time"`
@@ -22,15 +26,66 @@ type chain struct {
 	Time      time.Duration `json:"time"`
 }
 
-func Post(url string, params url.Values, headers map[string]string, proxyUrl string) (body []byte, err error, trans chain) {
-	return send("POST", url, strings.NewReader(params.Encode()), headers, proxyUrl)
+type request struct{}
+
+func NewRequest() (r *request) {
+	return &request{}
 }
 
-func Get(url string, params url.Values, headers map[string]string, proxyUrl string) (body []byte, err error, trans chain) {
+func (r *request) Send(method string, url string, params url.Values, headers map[string]string, proxyUrl string) (body []byte, err error, trans chain) {
+
+	var data string
+
+	if strings.ToUpper(method) == "GET" {
+		if params != nil {
+			url += "?" + params.Encode()
+		}
+	} else {
+		if len(params.Get("")) > 0 {
+			data = params.Get("")
+		} else {
+			data = params.Encode()
+		}
+	}
+
+	return send(method, url, strings.NewReader(data), headers, proxyUrl)
+}
+
+func (r *request) Post(url string, params url.Values, headers map[string]string, proxyUrl string) (body []byte, err error, trans chain) {
+	var data string
+	if len(params.Get("")) > 0 {
+		data = params.Get("")
+	} else {
+		data = params.Encode()
+	}
+	return send("POST", url, strings.NewReader(data), headers, proxyUrl)
+}
+
+func (r *request) Patch(url string, params url.Values, headers map[string]string, proxyUrl string) (body []byte, err error, trans chain) {
+	var data string
+	if len(params.Get("")) > 0 {
+		data = params.Get("")
+	} else {
+		data = params.Encode()
+	}
+	return send("PATCH", url, strings.NewReader(data), headers, proxyUrl)
+}
+
+func (r *request) Get(url string, params url.Values, headers map[string]string, proxyUrl string) (body []byte, err error, trans chain) {
 	if params != nil {
 		url += "?" + params.Encode()
 	}
 	return send("GET", url, nil, headers, proxyUrl)
+}
+
+func (r *request) Put(url string, params url.Values, headers map[string]string, proxyUrl string) (body []byte, err error, trans chain) {
+	var data string
+	if len(params.Get("")) > 0 {
+		data = params.Get("")
+	} else {
+		data = params.Encode()
+	}
+	return send("PUT", url, strings.NewReader(data), headers, proxyUrl)
 }
 
 func send(method string, httpUrl string, params io.Reader, headers map[string]string, proxyUrl string) (body []byte, err error, trans chain) {
@@ -39,6 +94,7 @@ func send(method string, httpUrl string, params io.Reader, headers map[string]st
 
 	var ch chain
 
+	ch.Url = httpUrl
 	ch.StartTime = startTime
 
 	var res *http.Response
@@ -84,17 +140,8 @@ func send(method string, httpUrl string, params io.Reader, headers map[string]st
 		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	}
 
-	uid, _ := uuid.NewV4()
-
-	workerId := uid.String()
-
-	ch.WorkerId = workerId
-
-	request.Header.Set("Worker-Id", workerId)
-	request.Header.Set("Token-Id", "X")
-	request.Header.Set("Device-Id", "x.lattecake.com")
-	request.Header.Set("Client-System", "X")
 	request.Header.Set("Client-Time", time.Unix(0, time.Now().UnixNano()).Format("2006-01-02 15:04:05.999999"))
+	request.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.162 Safari/537.36")
 
 	res, err = client.Do(request)
 	if err != nil {
